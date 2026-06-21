@@ -1,0 +1,206 @@
+
+---
+
+## 0. Intră în proiect
+
+```bash
+cd "$HOME/HIGH PERFORMANCE_proiect/miniLB"
+```
+
+Dacă pe cluster proiectul este în alt folder, schimbă calea de mai sus.
+
+---
+
+## 1. Încarcă mediul Python / Conda
+
+Exemplu, dacă ai același environment:
+
+```bash
+conda activate sycl_cuda
+```
+
+Dacă pe cluster nu există `conda activate sycl_cuda`, trebuie întâi să activezi mediul disponibil acolo.
+
+---
+
+## 2. Încarcă oneAPI / DPC++ / CUDA plugin
+
+Numele modulelor pot fi diferite pe cluster. Începe cu:
+
+```bash
+module avail oneapi
+module avail cuda
+module avail intel
+module avail compiler
+```
+
+Apoi încarcă modulele disponibile. Exemple posibile:
+
+```bash
+module load oneapi
+module load cuda
+```
+
+sau:
+
+```bash
+module load intel-oneapi-compilers
+module load cuda
+```
+
+Dacă există scriptul oneAPI:
+
+```bash
+source /opt/intel/oneapi/setvars.sh
+```
+
+Verifică dacă `icpx` există:
+
+```bash
+which icpx
+icpx --version
+```
+
+---
+
+## 3. Verifică dacă dpctl vede GPU-ul NVIDIA
+
+```bash
+python3 -m dpctl -f
+```
+
+Caută un device GPU cu backend CUDA. Poate apărea ca:
+
+```text
+cuda:gpu:0
+```
+
+sau uneori:
+
+```text
+ext_oneapi_cuda:gpu:0
+```
+
+Alege exact filter string-ul afișat.
+
+---
+
+## 4. Setează selectorul pentru miniLB
+
+Varianta preferată:
+
+```bash
+export MINILB_DEVICE_SELECTOR="cuda:gpu:0"
+export ONEAPI_DEVICE_SELECTOR="cuda:*"
+```
+
+Dacă `python3 -m dpctl -f` a afișat `ext_oneapi_cuda:gpu:0`, folosește:
+
+```bash
+export MINILB_DEVICE_SELECTOR="ext_oneapi_cuda:gpu:0"
+export ONEAPI_DEVICE_SELECTOR="ext_oneapi_cuda:*"
+```
+
+---
+
+## 5. Curăță build-ul vechi și configurează pentru GPU NVIDIA A100
+
+Pentru Leonardo Booster / A100, arhitectura este `sm_80`.
+
+```bash
+cd "$HOME/HIGH PERFORMANCE_proiect/miniLB"
+
+rm -rf our_builds/miniLB_step_pybind11
+
+cmake \
+  -S python_binding_extension/dpctl_examples/miniLB_step_pybind11_kernels \
+  -B our_builds/miniLB_step_pybind11 \
+  -DCMAKE_CXX_COMPILER=icpx \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DMINILB_ENABLE_CUDA=ON \
+  -DMINILB_CUDA_ARCH=sm_80 \
+  -DPython3_EXECUTABLE="$(which python3)" \
+  -Dpybind11_DIR="$(python3 -m pybind11 --cmakedir)"
+```
+
+Dacă `python3 -m pybind11 --cmakedir` nu merge, verifică:
+
+```bash
+python3 -c "import pybind11; print(pybind11.get_cmake_dir())"
+```
+
+și folosește calea afișată la `-Dpybind11_DIR=...`.
+
+---
+
+## 6. Compilează
+
+```bash
+cmake --build our_builds/miniLB_step_pybind11 -j
+```
+
+---
+
+## 7. Setează PYTHONPATH
+
+```bash
+export PYTHONPATH="$(pwd)/our_builds/miniLB_step_pybind11:${PYTHONPATH}"
+```
+
+---
+
+## 8. Rulează testul pe GPU
+
+```bash
+python3 python_binding_extension/dpctl_examples/miniLB_step_pybind11_kernels/test_minilb_step_pybind11.py
+```
+
+Rezultatul dorit este:
+
+```text
+miniLB V5 pybind11 + dpctl USM step check: OK
+```
+
+În output trebuie să vezi la device ceva de tip:
+
+```text
+backend_type.cuda
+device_type.gpu
+```
+
+sau un backend CUDA / NVIDIA echivalent.
+
+---
+
+## 9. Dacă nu vede GPU-ul
+
+Rulează:
+
+```bash
+python3 -m dpctl -f
+nvidia-smi
+which icpx
+icpx --version
+echo $ONEAPI_DEVICE_SELECTOR
+echo $MINILB_DEVICE_SELECTOR
+```
+
+Dacă `nvidia-smi` vede GPU-ul, dar `dpctl` nu vede `cuda:gpu`, problema este mediul oneAPI/CUDA plugin, nu codul miniLB.
+
+---
+
+## 10. Comandă compactă pentru rulări viitoare
+
+După ce mediul și build-ul sunt corecte:
+
+```bash
+cd "$HOME/HIGH PERFORMANCE_proiect/miniLB"
+conda activate sycl_cuda
+
+export MINILB_DEVICE_SELECTOR="cuda:gpu:0"
+export ONEAPI_DEVICE_SELECTOR="cuda:*"
+export PYTHONPATH="$(pwd)/our_builds/miniLB_step_pybind11:${PYTHONPATH}"
+
+python3 python_binding_extension/dpctl_examples/miniLB_step_pybind11_kernels/test_minilb_step_pybind11.py
+```
+
