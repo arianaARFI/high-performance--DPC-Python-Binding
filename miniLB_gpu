@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# miniLB V5 — rulare pe GPU NVIDIA/CUDA
+# Ajustează calea dacă proiectul este în alt folder.
+cd "$HOME/HIGH PERFORMANCE_proiect/miniLB"
+
+# Activează mediul Python.
+# Dacă pe cluster environment-ul are alt nume, schimbă linia.
+conda activate sycl_cuda
+
+# Încarcă modulele necesare.
+# Numele exacte pot varia pe cluster.
+# Verifică înainte cu: module avail oneapi ; module avail cuda
+# module load oneapi
+# module load cuda
+# sau:
+# source /opt/intel/oneapi/setvars.sh
+
+echo "=== Verific compiler ==="
+which icpx
+icpx --version
+
+echo "=== Device-uri dpctl ==="
+python3 -m dpctl -f
+
+# Pentru NVIDIA CUDA.
+# Dacă dpctl afișează ext_oneapi_cuda:gpu:0 în loc de cuda:gpu:0,
+# schimbă aceste două linii.
+export MINILB_DEVICE_SELECTOR="${MINILB_DEVICE_SELECTOR:-cuda:gpu:0}"
+export ONEAPI_DEVICE_SELECTOR="${ONEAPI_DEVICE_SELECTOR:-cuda:*}"
+
+echo "MINILB_DEVICE_SELECTOR=${MINILB_DEVICE_SELECTOR}"
+echo "ONEAPI_DEVICE_SELECTOR=${ONEAPI_DEVICE_SELECTOR}"
+
+echo "=== Configure CMake pentru GPU ==="
+rm -rf our_builds/miniLB_step_pybind11
+
+cmake \
+  -S python_binding_extension/dpctl_examples/miniLB_step_pybind11_kernels \
+  -B our_builds/miniLB_step_pybind11 \
+  -DCMAKE_CXX_COMPILER=icpx \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DMINILB_ENABLE_CUDA=ON \
+  -DMINILB_CUDA_ARCH=sm_80 \
+  -DPython3_EXECUTABLE="$(which python3)" \
+  -Dpybind11_DIR="$(python3 -m pybind11 --cmakedir)"
+
+echo "=== Build ==="
+cmake --build our_builds/miniLB_step_pybind11 -j
+
+echo "=== Run test ==="
+export PYTHONPATH="$(pwd)/our_builds/miniLB_step_pybind11:${PYTHONPATH:-}"
+
+python3 python_binding_extension/dpctl_examples/miniLB_step_pybind11_kernels/test_minilb_step_pybind11.py
