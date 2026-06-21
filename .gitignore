@@ -29,3 +29,7 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 .vscode/
+
+# miniLB generated builds
+miniLB/our_builds/
+miniLB/**/_deps/

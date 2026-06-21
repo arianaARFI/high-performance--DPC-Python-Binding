@@ -1,0 +1,18 @@
+build/
+.vscode/
+.cache/
+.clangd
+
+# Fortran code
+fortran/RUN/*.x
+*.o
+*.mod
+
+# simulation output files
+*.dat
+*.log
+*.vtk
+
+
+benchmark/
+.bgk2d_venv/
