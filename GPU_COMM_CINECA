@@ -1,7 +1,9 @@
-
+de pe git 
+git clone https://github.com/arianaARFI/high-performance--DPC-Python-Binding.git
+cd high-performance--DPC-Python-Binding
 ---
 
-## 0. Intră în proiect
+## 0. Intră în proiect-cred ca se schimba numele
 
 ```bash
 cd "$HOME/HIGH PERFORMANCE_proiect/miniLB"
