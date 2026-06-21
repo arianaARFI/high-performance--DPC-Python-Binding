@@ -1,0 +1,31 @@
+# Build folders
+build/
+**/build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Python environments
+.venv/
+venv/
+env/
+
+# Compiled modules
+*.so
+*.dylib
+*.dll
+
+# Windows/WSL metadata
+*:Zone.Identifier
+
+# Jupyter
+.ipynb_checkpoints/
+.vscode/

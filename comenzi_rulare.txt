@@ -1,0 +1,123 @@
+Comanda 0: Pentru rularea mea
+
+cd "/mnt/d/Facultate/Anul 2/Sem2_Erasmus/HIGH PERFORMANCE_proiect/miniLB"
+
+Comanda 1
+
+source /opt/intel/oneapi/setvars.sh
+
+export LD_LIBRARY_PATH=/opt/intel/oneapi/umf/1.0/lib:/opt/intel/oneapi/compiler/latest/lib:/opt/intel/oneapi/compiler/latest/lib/x64:/opt/intel/oneapi/tbb/latest/lib:$LD_LIBRARY_PATH
+export OCL_ICD_FILENAMES=/etc/OpenCL/vendors/intel64.icd
+
+
+Comanda 2: - daca nu avem folderul build_single
+
+
+rm -rf our_builds/build_single
+mkdir -p our_builds/build_single
+
+cmake -S . -B our_builds/build_single \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DSYCL_IMPL=dpcpp \
+  -DCMAKE_CXX_COMPILER=icpx \
+  -DBGK_USE_CASE=LDC \
+  -DBGK_PRECISION=SINGLE \
+  -DBGK_SYCL_MALLOC_SHARED=ON \
+  -DBGK_SYCL_ENABLE_PREFETCH=OFF \
+  -DBGK_SYCL_IN_ORDER_QUEUE=ON \
+  -DBGK_SYCL_ND_RANGE=OFF \
+  -DBGK_DEBUG_HOST_QUEUE=OFF
+
+cmake --build our_builds/build_single -j
+
+
+
+Comanda 2' : Daca avem build_single
+
+cmake --build our_builds/build_single -j
+
+
+Comanda 3: Rulare miniLB
+
+cp python_binding_extension/inputs/bgk_512.input our_builds/build_single/bgk.input
+
+cd our_builds/build_single
+
+ONEAPI_DEVICE_SELECTOR=opencl:cpu time ./bgk2dSYCL
+
+cd ../..
+
+
+Comanda 4: Copileaza pybind11 
+
+cmake -S python_binding_extension/python_bindings \
+  -B python_binding_extension/build_py \
+  -DCMAKE_BUILD_TYPE=Release \
+  -Dpybind11_DIR="$(python3 -m pybind11 --cmakedir)"
+
+cmake --build python_binding_extension/build_py -j
+
+
+
+Comanda 5: testare import
+
+python3 - << 'EOF'
+import sys
+sys.path.insert(0, "python_binding_extension/build_py")
+
+import minilb_py
+print("Module loaded:", minilb_py.__doc__)
+EOF
+
+
+
+Comanda 6: Testare input din Python
+
+python3 - << 'EOF'
+import sys
+sys.path.insert(0, "python_binding_extension/build_py")
+
+import minilb_py
+
+minilb_py.create_input(
+    "test_from_python.input",
+    lx=512,
+    ly=512,
+    svisc=0.05,
+    u0=0.1,
+    itfin=5000,
+    ivtim=500,
+    isignal=500,
+    icheck=500
+)
+
+print("Input created from Python")
+EOF
+
+cat test_from_python.input
+
+
+Comanda 7: Rulare benchmark de Python:
+
+python3 python_binding_extension/benchmark_minilb.py
+
+Comanda 8:
+
+cat python_binding_extension/results/benchmark_results.csv
+cat python_binding_extension/results/cpu_optimization_results.txt
+
+Comanda 9: Rulare exemplele dpctl (pe rand)
+
+unset LD_LIBRARY_PATH
+unset OCL_ICD_FILENAMES
+
+python3 python_binding_extension/dpctl_examples/vector_add_dpctl.py
+python3 
+
+python_binding_extension/dpctl_examples/lbm_density_dpctl.py
+python3 
+
+python_binding_extension/dpctl_examples/lbm_collision_dpctl.py
+python3 
+
+python_binding_extension/dpctl_examples/miniLB_dpctl.py
